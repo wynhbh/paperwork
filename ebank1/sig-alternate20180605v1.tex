@@ -1,0 +1,548 @@
+\documentclass{llncs}
+\usepackage{graphicx}
+\usepackage{epsfig}
+\usepackage{multirow}
+\setcounter{secnumdepth}{3}
+%\usepackage{ctex}
+
+\begin{document}
+
+\title{Characterizing Usage Patterns for On-line Banking}
+
+\author{
+% 1st. author
+%\alignauthor
+%Yuan Wang, Chen Song\titlenote{Chen Song, corresponding author, Research Assistant, interested in security on network, SDN and big data, songchen@iie.ac.cn}, Liming Wang, Zhen Xu, Hongjia Li\\
+%       \affaddr{Institute of Information Engineering, CAS}\\
+%       \email{\{songchen,wangyuan\}@iie.ac.cn}
+% 2nd. author
+%\alignauthor
+%Jianbo Gao\\
+%       \affaddr{Guangxi University, China}\\
+%       \email{jbgao.pmb@gmail.com}
+%% 3rd. author
+%\alignauthor Lars Th{\o}rv{\"a}ld\titlenote{This author is the
+%one who did all the really hard work.}\\
+%       \affaddr{The Th{\o}rv{\"a}ld Group}\\
+%       \affaddr{1 Th{\o}rv{\"a}ld Circle}\\
+%       \affaddr{Hekla, Iceland}\\
+%       \email{larst@affiliation.org}
+%\and  % use '\and' if you need 'another row' of author names
+%% 4th. author
+%\alignauthor Lawrence P. Leipuner\\
+%       \affaddr{Brookhaven Laboratories}\\
+%       \affaddr{Brookhaven National Lab}\\
+%       \affaddr{P.O. Box 5000}\\
+%       \email{lleipuner@researchlabs.org}
+%% 5th. author
+%\alignauthor Sean Fogarty\\
+%       \affaddr{NASA Ames Research Center}\\
+%       \affaddr{Moffett Field}\\
+%       \affaddr{California 94035}\\
+%       \email{fogartys@amesres.org}
+%% 6th. author
+%\alignauthor Charles Palmer\\
+%       \affaddr{Palmer Research Laboratories}\\
+%       \affaddr{8600 Datapoint Drive}\\
+%       \affaddr{San Antonio, Texas 78229}\\
+%       \email{cpalmer@prl.com}
+}
+
+\maketitle
+\begin{abstract}
+Although online banking has attracted millions of customers for its convenience, the characteristics of online banking accounts are
+relatively less explored. In this work, we extensively
+analyze the characteristics of online banking customer behaviors,
+using a dataset, of 3,411,486 customers and 23,852,308 sessions, collected
+from one of top banks in China.
+We first characterize customer behaviors by session analysis. Two observations are achieved (1) customer behaviors mostly comply with the power-law distribution with the fat tail which implies extreme events occurs beyond normal expectation; (2) sessions from thirdparty websites have less duration time and operations than those from online banking website on average.
+Then we use clickstream model to present the sequences of customer transaction activities. By comparing the
+different operation patterns, we explain the reason why thirdparty sessions take less operations and time.
+At last, we investigate the details of transaction activities, e.g.,
+transaction frequency, amount, number of payees in a session and observed that the non-transaction sessions have less time and operations
+than transaction sessions. Our analysis reveals some kinds of customers rather than normal personal accounts behind the wide variety of customer behaviors, like corporate accounts and dishonest internal employees.
+\end{abstract}
+
+\keywords{Online bank; user behavior; power-law distribution}
+
+\section{Introduction}
+
+As one of the most well-known modern financial services, online banking (also known as Internet banking/E-banking) is accessible in most countries nowadays~\cite{Kiljan:journals/csur/KiljanSCEV17}. Beneficial to online banking, customers can complete their financial activities like payments, money transfers or investment in a convenient and efficient manner at anytime or anywhere~\cite{Hanafizadeh:journals/tele/HanafizadehKK14}. They usually conduct the online banking activities via a web browser when they access the bank's personal online banking service. %As reported in [], the transactions completed through online banking have surpassed those at bank counters in 2010 in China.
+
+Considering that hundreds of millions of customers are attracted by the convenience of the online banking, understanding the customer behavior is urgent because (1) it can help banks to remarkably improve the costumers' experience based on customers' habit by the way of making most used services more obvious and easy to access; (2) it can help banks in risk control for restricting some extreme behaviors to avoid potential loss. Also, it can also help banks for providing more appropriate advertisements according to customers' interest. However, few studies have been carried out on understanding customer behaviors due to some barriers existed. The first is that privacy issues cause researchers to lack open data sources. Another is the competition issue, so most reports on online banking customers provide coarse results without detailed analysis.
+
+Due to cooperation with a large Chinese bank, we have the opportunity to investigate online banking customer behaviors based on the anonymized ground-truth dataset. The dataset is composed of various transactions, e.g., viewing account balances, money transfers, and bill payments, totally includes 3,411,486 customers and 23,852,308 sessions in the duration of 12 days.
+
+In this paper, we systematically studied the customer behavior of online banking. We first analyze customer behavior from the session level, understand when the customer logged in, and how long the customer lasted. Then we use the Markov chain to model the clickstream to show the transaction details. In these analyses, we compared conversations from thirdparty websites with online banking websites. In addition, we investigate the details of the payment behavior, such as differences in non-transaction and transaction sessions, payment frequency, amount, and the number of payees in the session. Our main contributions are stated as follows:
+
+1) We first present analysis results of customer behavior from a session layer. We find that session length (of requests) is a power-law behavior and that sessions from online banking website have a marked bimodal pattern in working hours, while sessions from thirdparty websites do not perform as well.
+
+2) By using clickstream model based on first-order Markov Chain, we show a holistic view of customer transaction sequences. Comparing thirdparty activities with the online banking activites, we provide the explanation of their differences of session duration and session length.
+
+3) We provide insights into transaction behavior. We find that transaction amount follows a lognormal distribution. Our analysis of accounts customers owned shows the behavior of money laundry and that analysis of the number of transactions and payees per session shows that the dishonest internal employees and corporate customers are among the personal accounts.
+
+%4) Since people cannot put more emphasis on the general needs of banking security~\cite{Aladwani:journals/ijinfoman/Aladwani01}, we scrutinize our analysis from a security perspective. We have discovered that some extreme events may have potential security issues. For example, too many IP addresses appear in a session may cause session-hijacks, and some operations in some sessions exceed timeout limits may cause information leakage.
+
+The reminder of this paper is organized as follows. Section 2 describes the data used in this paper and Section 3 estimates the access patterns of online banking customer, especially characteristics of session layer. In Section 4, we present the operation patterns by using clickstream model. In Section 5, we investigate the transaction behavior and summarize the findings we derived and implications. Section 6 discusses the related work, while Section 7 concludes this paper.
+
+
+\section{Data Description}
+
+
+With the online banking system, customers log in to access the online banking service through a browser, or access the online banking service through an account marked with an individual customer or company customer, and they can perform various financial activities, various inquiries, money transfers, fee payments, investments. Each request of a customer will be stored as a record in the data.
+%A record is composed of values of attributes available in a transaction, for instance, timestamp, account ID, operation, amount.
+Our data is collected from one of the top banks in China's online banking system which provides online services for millions of customers every day. It includes all the records in the duration of 12 days from July 7, 2014 to July 18, 2014.
+%The customer logs off via the logout button, kills the web page or leaves until it times out (15 minutes on this system). In fact, the online banking system allocates the customer a session ID before login, and assigns a new authenticated session ID after login. In interaction with the online banking system,
+The record contains various information about the customer's behavior, such as time stamp, account ID, payer ID, payee ID, operation (e.g. login, money transfer), amount, login IP, login area, operation status (success or failure).
+
+%Personal information was anonymized to meet personal privacy policy. Three types of sensitive information about customer identities are anonymized: (1) customer login ID (or user ID) usually with a unique ID for one customer in the online banking website, (2) customer transaction IDs (payer IDs or query IDs) in the online banking site, one for a card, where sometimes one customer login ID may correspond to a few transaction IDs, (3) payee IDs of the beneficiary account in a transaction.
+
+%These customers are marked as personal accounts, unlike company accounts.
+A session is a period of a customer's activity from its login to its logout and is usually combined with a few records. A session ID is kept by the online banking system in the duration of the whole session. Our data includes 101,833,505 records and 23,852,308 sessions in total. In our data, 10,831,022 records about 10.64\% of the all records are labeled as failed. The errors that results in the fail of the access to the online banking system are mainly validation errors and runtime exceptions, and they reach the 65.2\% and $12.3\%$ of all records, respectively. Validation errors are caused by authentication errors, such as login errors, password errors, and user input errors. In order to ensure the security of the transaction, the customer will suffer from a lot of verifications and thereby this leads to a trade-off between the availability and security of the service. After filtering the error log, we have 23,212,800 sessions and finally 91,002,483 records in total.
+
+The characteristics of the authenticated session is that the session retains the user ID for the successful login of customers, which is not found in an unauthenticated session.
+The authenticated session contained 4,983,518 sessions and 3,412,869 customers via customer login ID, which included 23,863,321 records in total.
+%In Figure 1, we can see that people barely operate before logging on.
+77.72\% of unauthenticated sessions have only one operation, compared to 5.5\% of authenticated sessions. There are 1222 operations for the longest unauthenticated session, hovering before login. Unauthenticated sessions may be created by the crawler and have less value than authenticated sessions, so our analysis in the following sections will focus on authenticated sessions. Operation describes a customer's action like `login' or `logout' in the online banking system. Transaction/Non-transaction: When at least one transaction (money-moving operation) in a session, we call it a transaction session, otherwise non-transaction session.  Account has 2 kinds of accounts in this paper, customer account, one customer has one customer account; transaction account, one customer has at least one transaction account, corresponding to one bank card, also called payer or payee under different roles in transaction activities.
+
+
+%%%%%%%%%%%%% describe the third party payment
+
+\begin{table*}
+\centering
+\caption{Summary of the on-line banking data}
+\begin{tabular}{|c|c|c|c|c|} \hline
+\multicolumn{2}{|c|}{}&Records&Sessions&Customers\\ \hline
+\multicolumn{2}{|c|}{Unauthenticated}&18,162,843&12,467,088&0\\ \hline
+\multirow{2}*{Authenticated}&Website&56,249,672&6,457,533&2,707,737\\
+\cline{2-5}
+&Thirdparty&16,589,968&4,288,179&1,375,557\\ \hline
+\multicolumn{2}{|c|}{Total}&91,002,483&23,212,800&3,411,486\\ \hline
+\end{tabular}
+\end{table*}
+
+
+The customers can also access online banking services through thirdparty websites. For example, a customer surfs an online shopping website, finds a product of interest, and then logins to an online banking account for payment. In online banking system, these sessions from thirdparty websites are given a special login API (`PayGateLogin'). In our paper, we use `thirdparty' to denote these sessions and `website' for sessions login from homepage. In the dataset, we had a total of 4,288,179 thirdparty sessions. As the statistical results shown in Table~1, we can infer that 671,808 customers login both from online banking homepage and third party websites.
+
+%\textbf{Data limitations.} Although the data set provides a comprehensive view of the customer's behavior, it has some potential limitations. First, the data only records the activity information that the customer completed in the online banking system. It does not contain some information about the entire system. For example, the number of all customers, which led us to derive the actual frequency of all account logins. In most records, information about the client (such as browsers and operating systems) is lost. Second, it does not contain invisible transactions, so we can observe how many customers paid during this time and we cannot extrapolate the amount of the money that these accounts receive. In the end, e-finance has developed so much that our data can only show snapshots of customer behavior. The CFCA (China Financial Certification Center) report shows that China Mobile Banking has been catching up with online banking services in 2017.
+
+\section{Access Patterns}
+
+
+%In this section, we comprehensively investigate the features of customer behavior by session analysis. How to describe the customer access activity? First, we investigate customer access patterns such as login time, duration, and location. We also discuss inter-session features, such as the time interval of customer behavior. We found that most features of customer sessions are power-law distributions and some are heavy-tail distributions. In our analysis, we observed that online banking customers in some aspects show different behavior patterns with OSN users.
+
+\begin{figure*}[b]
+\centering
+\epsfig{file=loginbyday2.eps, width=4in}
+\caption{No. of customer logins over time (interval of 1 hour).}
+\end{figure*}
+
+\subsection{Inter-Session Access Patterns}
+
+Login frequency is the key metric for the online banking system. We first study the login frequency of customers in term of the number of logins per hour in the duration of 12 days. As shown in Figure~1, both logins from the online banking website and the thirdparty websites reveal a clear diurnal pattern, i.e. the heavy logins in the daytime and the light logins at night. The logins from online banking homepage are significantly different from those via the thirdparty websites. It is observable that the number of website logins on every day is bimodal. Specifically, one peak appears before lunch time (10 am$\sim$11 am), and the other appears at afternoon (3 pm$\sim$4 pm), which implies that more people like to access to online banking at work time.
+
+As described in \cite{li2012non}, the access pattern of customers follows a power-law distribution for traditional counter service. In contrast, customers can access the online banking system at anytime via the online banking system and thereby increase the service capability for the bank. As shown in Figure~1, the online banking system responses to tens of customers every second in busy period, while the inter-arrival time even achieves 325 seconds at night for the online banking system.
+Also, logins of online banking at weekend are remarkably less than that on weekdays. However, the logins from the thirdparty websites do not reveal the bimodal pattern and the weekend pattern.
+
+
+\begin{figure*}[ht]
+\centering
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2in]{sessionduration.eps}
+		\centerline{(a)Session duration}
+	\end{minipage}
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2in]{sessionsperIP2.eps}
+		\centerline{(b)No. of sessions per IP}
+    \end{minipage}
+    \caption{Characteristic of inter-session.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+Figure~2(a) shows CCDF as session duration varies. The complementary cumulative distribution(CCDF) is defined as
+ \begin{equation}
+ F(x) = P(X>x)
+\end{equation}
+which presents more information on the tail-end extreme events that are opposite to the cumulative distribution (CDF).
+The customers spent less time from the thirdparty websites (thirdparty) than that from online banking (website). Specifically, the mean and median of session duration of thirdparty sessions are 71.4s and 34s, 209.6s and 87s for website sessions. Obviously, the customers double the time on website sessions than thirdparty sessions on average. Most of sessions from thirdparty websites last for a short time. As shown in Figure~2(a), $85.47\%$ of thirdparty sessions are less than 100s, while only $58.62\%$ of website sessions last less than 100s. Also, some sessions from website last for a longtime, even for a few hours.
+
+%We extract the sessions (`login$\&$logout') with both login and logout from website sessions when estimating session duration time. It is because that some customers usually do not finish their sessions by logout, leaving their sessions on until timeout or the pages are killed. In our data, only $20.3\%$ of website sessions are ended by logout. From the plot, we can find that sessions with `logout' have a smaller proportion of the longtime sessions than whole website sessions.
+
+
+We examine the session distribution per IP in Figure~2(b), which shows a power-law distribution in CCDF plot.
+The power-law distribution has a probability density function (PDF)
+ \begin{equation}
+ f(x)\sim x^{-\alpha-1},\quad x \rightarrow \infty
+\end{equation}
+where the complementary cumulative distribution (CCDF) is
+ \begin{equation}
+ P(X\geq x)\sim x^{-\alpha},\quad x \rightarrow \infty
+\end{equation}
+The power-law-type distribution is called heavy-tailed or fat-tailed if
+$\alpha < 2$. In this case, the variance of the random variable is infinite. Furthermore, when
+$\alpha \leq 1$, the mean of random variable is also infinite. In stark contrast are commonly used thin-tailed distributions, such as exponential distributions and normal distributions, where the variance is always finite, and the sum of these variables is controlled by the Big Number Theorem¡ªthey always converge to the normal distribution, summation of heavy-tailed random variables converge to stable laws with infinite variance~\cite{gao:2007multiscale}. The power-law distribution was fitted with the parameter $\alpha=1.329$, which tells that it is also a heavy-tailed distribution. The number of sessions varied largely per IP, which is caused by two main reasons. On one hand, some IP addresses used by different customers are distributed dynamically by DHCP server. On the other hand, the extreme numbers are caused by NAT environment, where most customers share the same IP address. The maximum is 1,137,927 sessions for one IP, which is used by many customers concurrently.
+
+
+\subsection{Intra-session Access Patterns}
+
+
+%A large amount of information about the statistical nature of random variables can be provided by its distribution. In our analysis, we found that most of the characteristics of customer behavior are heavy-tailed distributions. The tail of the heavy-tailed distribution is heavier than the exponential distribution. This implies that extreme events are more likely to occur than normal or exponential distributions, and the ratio of maximum to minimum is higher, for example, the maximum value (100,000,000) is 10,000,000,000 times the smaller value (0.01) of transaction amounts (CNY).
+
+To characterize the period of time during which a session is active, we use a time series \emph{l}(\emph{i}) which denotes the length of the \emph{i}th session in the trace, defined as the number of requests in that session. In Figure~3(a), we observe that there are different distributions among unauthenticated sessions, website sessions and thirdparty sessions. $91.9\%$ of unauthenticated sessions have less than 3 requests, while only $19.02\%$ of website sessions and  $11.51\%$ of thirdparty sessions have less than 3 requests. When comparing with website sessions, which have $53.29\%$ of sessions with less than 6 requests, $93.94\%$ of thirdparty sessions have less than 6 requests. It is obvious that the customers have did more in online banking system. The main factor is that the online banking system offer the customer more varied financial services.
+
+In Figure~3(b), we observe a well fitted power-law distribution of session length of online banking sessions (website) in double-logarithmic plot of CCDF and a power-law tail
+for the distribution of thirdparty sessions. The fitting result of website sessions is shown in Eq.(3) with $\alpha = 1.558$. It tells that the distribution of website sessions is a heavy-tailed distribution. It means that the long sessions are more than expectation as exponential distribution or normal distribution, e.g., the longest session has 44,187 requests.
+
+\begin{figure*}[ht]
+\centering
+\label{fig:intrasession}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{allsessionlength2.eps}
+		\centerline{(a)Session length}
+	\end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{sessionlengthfit2.eps}
+		\centerline{(b)Fitting for session length}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{interrecord2.eps}
+		\centerline{(c)Inter-request time}
+    \end{minipage}
+    \caption{Characteristic of intra-session.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+We also characterize the inter-request time within a session. The CCDF distribution is shown in Figure~3(c). Because of the timeout settled by online banking, the distributions present a large change around 900 seconds(15m). The inter-requests more than 900s happen when customer return to the online banking system after timeout, the online banking will still record this request with the session ID kept in customer client cache. However, the online banking system will not respond to this request and will require customers to login again.
+
+
+\subsection{Customer Access Patterns}
+%% frequency\duration\intertime\IP
+
+To understand the access pattern from customer perspective, we characterize the access frequency, customer duration, the number of IP per customer.
+
+
+\begin{figure*}[ht]
+\centering
+\label{fig:customeracess}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{loginsperID2.eps}
+		\centerline{(a)Frequency of accesses}
+	\end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{durationperuid.eps}
+		\centerline{(b)Total time}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{IPsperUser2.eps}
+		\centerline{(c)No. of IPs}
+    \end{minipage}
+    \caption{Characteristic of customer access.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+To characterize the activity of the online banking customer, it describes the login frequency for customer accounts in Figure~4(a). Customers login the online banking system differently in the frequency. $45.41\%$ of customers access only once during the 12-day period. The customers totally accessed online banking system on average 3.15 times over the 12 days. Due to the data limitation, the actual average number of logins should be fewer. The distribution of website logins apparently follows a power-law distribution, in comparison, the distribution of thirdparty logins has an abnormal heavier tail. It means that some customers have an unusually large number of logins via thirdparty websites. The largest number of logins is 19,045 for thirdparty sessions, which means the account logins every 54 seconds on average from thirdparty website, while it is 413 for website sessions.
+
+
+To characterize the adhesiveness of the online banking customer, Figure~4(b) shows the total time spend accessing online banking varied per individual.
+$88.97\%$ of the customers spent no more than 15 minutes (timeout) at the online banking system. over the 12 days. Only $1\%$ of the customers spent in total more than an hour. It is
+obvious that people spent less time at online banking system than OSN sites\cite{conf/imc/BenevenutoRCA09}. The frequency and duration of accesses is not strongly correlated to each other (correlation coefficient 0.28) in whole dataset. When we consider customers who have more than 100 sessions in 12 days, it shows a high correlation(correlation coefficient 0.75).
+
+The last variable we characterize from the customer perspective is the number of IPs per customer. Figure~4(c) tells that the number of IPs apparently
+follows power-law distribution with $\alpha=2.76$. Because some customers use static IP addresses, some customers are given IP addresses by DHCP server, so the number of IPs is not highly correlated to the number of sessions the customer complete in 12 days (correlation coefficient 0.1).
+
+
+\section{Customer Operation Pattern}
+
+
+To gain a holistic view of customers' activities of thirdparty and website, we use the clickstream model\cite{conf/imc/BenevenutoRCA09}. We build a first order Markov chain of customer activities and compute the probability transition between every pair of activity states. As shown in Figure 5 and Figure 6, nodes represent actions customers take and directed edges represent
+the transition between two actions. The initial
+state is \emph{Login} action for website sessions, \emph{PayGatelogin} for thirdparty sessions.
+We add a abstract state \emph{FINAL},
+because of that some customers do not have a logout as the end of the sessions.
+In fact, there are thousands of states in the online banking system, as so many
+financial services available. Although the sum of outgoing transitions from each
+state is 1.0, we only keep the edges with probability $>0.05$ in the following
+figures for complexity. Then, we will separately present the results of website sessions and
+thirdparty sessions.
+
+
+ \begin{figure*}[ht]
+    \centering
+    \epsfig{file=transite41110.eps, width=4in}
+    \caption{State transitions for a thirdpay session.}
+\end{figure*}
+
+\begin{figure*}[ht]
+    \centering
+    \epsfig{file=transite55301.eps, width=4in}
+    \caption{State transitions for a website session.}
+\end{figure*}
+
+\emph{State transition for thirdparty session:} Figure 5 demonstrates that the thirdparty sessions follow a regimented set of behaviors, because of the limited interfaces the online banking system open to thirdparty websites. The main sequence of activities is T1 (PayGatelogin, SingleActBalQry, PayGateTransferConfirm, PayGateTransfer, FINAL), which means the customer login via thirdparty, query, confirm and complete the transfer task. In fact, because of the business model between the customers, online banking system and thirdparty payment tools like Alipay, these transactions do not transfer the money immediately(only 398/4,288,179 with direct money-moving).
+
+\emph{State transition for website session:} Compared to thirdparty, website customers engage in more diverse activities (Figure 6). After pruning edges, we can finally derive four main activity sequences:
+
+\begin{enumerate}
+  \item[1)] The first login activity sequence W1(Login, PFirstLoginPre, PFirstLoginConfirm, PFirstLogin, FINAL), describes how customers complete their first login with some checks like nickname check.
+  \item[2)] The query activity sequence W2(Login, ActListQry, GCSubActQry, PExchSubActQryListAc, ActTrsQryPre, ActTrsInfoQry, FINAL), shows the common path for queries of account balances or recent transaction information. It is the most frequent tasks with probability of 0.36 among the transaction data in the online banking system.
+
+  \item[3)] The innerbank-transfer transiton sequence W3(Login, BankInnerTransferPre, BankInnerQryPrv, BankInnerTransferConfirm, BankInnerTransfer, FINAL),
+describes how customers transfer their money between accounts in this online banking system.
+
+  \item[4)] The interbank-transfer transition sequence W4(Login, TransferPre, ProvinceListQry, BankListTSQry, SingleActBalQry, TransferConfirm, Transfer, FINAL), shows how to transfer funds to accounts out of the online banking system.
+
+\end{enumerate}
+
+By comparing thirdparty transaction activities (Figure 5) with the online banking activites shown in Figure~6, we can find that to complete one transaction, customers mainly take 4 steps (T1) for thirdparty sessions but 4 (W1), 6 (W2), 5 (W3) and 7 (W4) steps for website sessions. It explains the difference between thirdparty and website sessions about session length shown in Figure 3(a).
+
+To estimate the time an activity takes, we utilize a time series t(i), i=1,2,3,... to demote the arrival time of the ith request in customer sequences. The time series a(i) is defined as $t(i+1)-t(i)$ and it denotes the inter-request time of the ith and i+1th requests in a session. We calculate the mean of a(i) for every transition in customer sequences, e.g., the mean of transition time of `Login' to `TransferPre' is 19.8s, and sum up the transition mean times to estimate the time that an activity will take. We derive that T1 will take about 45.6s, W1 will take 103.4s, W2 will take 54.1s, W3 will take 81.3s,  W4 will take 181.9s. This explains the difference of session duration shown in Figure 2(a).
+
+% T1=5.9425251068+6.55851788754+33.1114121094
+% W1= 0.213333895203+92.727931917+10.4941064999
+% W2= 15.1998094206+9.0535327207+3.04165039689+13.1576828547+13.6586705563
+% W3= 16.6965192652+2.15317030629+22.1567767845+40.2536383376
+% W4= 1
+
+%In summary, we analyze the online banking system customers' behavior from session and activity transitions. From results described above, we can roughly figure out characteristics of online banking customers' behaviors, e.g, when they come and leave, what they do. However, online banking system is an Internet service for financial transactions, the more valuable information is about how customers deal with their money. Therefore, we scrutinize the details of the transaction behavior in the next section.
+
+
+\section{Transaction Pattern}
+
+%In our analysis, there are kinds of transaction (money moving) tasks, including purchasing term deposits. We try to understand how customers transact all these kinds of financial transactions in this section. First, we discuss the different behaviors between transactional and non-transactional sessions. Then, we examine the details of customers' transaction behavior.
+
+
+\subsection{Transaction \& Non-transaction}
+
+
+We first examine the characteristics of non-transaction activities and transaction activities from the session layer. In our data, there are total 1,253,652 transaction sessions, and most of transaction sessions are derived from website sessions.
+
+\begin{figure*}[ht]
+\centering
+\label{fig:transction_nontransaction}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.5in]{sessiondurationnopay2.eps}
+		\centerline{(a)Session duration}
+	\end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.5in]{sessionlengthnopay2.eps}
+		\centerline{(b)Session length}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.5in]{sessionlengthnopayccdf2.eps}
+		\centerline{(c)Session length}
+    \end{minipage}
+    \caption{Characteristics of non-transaction and transaction sessions.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+As shown in Figure~7(a), non-transaction sessions take less time than transaction sessions. Most of transaction sessions ($72.66\%$) last from 100s to 1000s, while most of non-transaction sessions($58.58\%$) last from 10s to 100s. The mean and median of session duration are 329s and 193s for transaction sessions, while they are 119.6s, and 38s for non-transaction sessions.
+
+Also, non-transaction sessions have less requests as shown in Figure~7(b), $91.25\%$ of non-transaction session have less than 10 requests, while only $36.14\%$ of transaction sessions have less than 10 requests. The mean and median of session length are 16.3 and 11 for transaction sessions, 5.5 and 4 for non-transaction sessions.
+The reason is that most of non-transaction sessions are query tasks, which spend less time and need fewer operations than that of transaction tasks. For example, query tasks usually do not need SMS OTP (One-time password) authentication. Figure~7(c) shows that the distribution of session length of non-transaction sessions is fitted to a power-law distribution with parameters $\alpha=1.524$ and $\alpha=2.083$ for non-transaction sessions. The session length of non-transaction sessions also follows the heavy-tailed distribution, which means that it varies more widely than that of transaction sessions. It can be explained that customers of transaction tasks have more clear goals than that of non-transaction tasks.
+
+
+\subsection{Transaction Times}
+
+
+\begin{figure*}[ht]
+\centering
+\label{fig:transction_session}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{paymentspersession2.eps}
+        \begin{center}
+        {(a)No. of transactions in one session}
+        \end{center}
+		% \centerline{(a)Number of transactions in one session}
+	\end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{paymenttop2.eps}
+        \begin{center}
+        {(b)The ratio of dominating transaction type}
+        \end{center}
+		%\centerline{(b)Ratio of top 1 transaction in one session}
+    \end{minipage}
+    \begin{minipage}[t]{0.3\linewidth}
+		\centering
+		\includegraphics[width=1.45in]{paymentpayee2.eps}
+        \begin{center}
+        {(c) The No. of transactions and payees}
+        \end{center}
+		%\centerline{(c)The number of transactions and payees in one session}
+    \end{minipage}
+    \caption{Characteristic of transaction sessions.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+To understand the transaction behavior, we first examine the transaction times in a session.
+The distribution of the number of transactions per session is shown in Figure~8(a), which follows a power-law distribution with $\alpha=1.922$.
+$85.46\%$ of transaction sessions have only one transaction in one session. However, the maximum is 3240 transactions in a session.
+
+We investigate the transaction sessions by dominating transaction type, which is the most transaction type in a session. It shows the ratio of the dominating transaction type in one session in Figure~8(b). We can find that the more transactions one session has, the more transaction types are centralized. When a session has more than 10 transactions, the dominating transaction type contributes most of transactions: the ratio of dominating transaction type is greater than or equal to 0.5 for $100\%$ of these sessions; it is greater than 0.969 for $90\%$ sessions.
+
+
+To further examine the transaction behavior, Figure~8(c) shows the number of transactions and payees in a session.
+We find that sessions follow two trends in Figure~8(c): One is that lots of transactions refer to a few payees in a session; the other is that the number of payees increases as the number of transactions increases in a session. 1) We choose the group of sessions with transactions more than 100 and payees more than 100. After examining the transaction type and amount for every session, we confirm these sessions are wage payments of corporate customers.
+2) We choose the group of sessions with more than 100 transactions and less than 10 payees to analyze manually.
+ These sessions are mainly divided into two transaction types. One type of sessions are fee payment transaction, which refer to business tasks. The other type of sessions are proved to be fraud behaviors by the bank employees, for better job performance.
+
+
+%In our analysis about the relationships between the payees referring to sessions, it tells us that these sessions build a few communities, which emphasizes our conclusion of corporate behaviors.
+
+%2) Second, we examine the sessions which indicate the customer pays many times to few payees in a session. We choose the group of sessions with more than 100 transactions and less than 10 payees to analyze manually.
+%Because of amount limit, people sometimes do transfer a few times to another account in a session, but hundred of transactions are too many in common sense. After investigation, these sessions are mainly divided into two transaction types. One type of sessions are fee payment transaction, which refer to business tasks. The other type of sessions are proved to be fraud behaviors by the bank employees, for better job performance.
+
+\textbf{Correlation} In our analysis, we find that the session length is heavily correlated with the number of transactions for those sessions which have the same dominating transaction type. We use Pearson correlation coefficient to measure the significance of the correlation. The correlation coefficient (R) ranges from -1 to 1.
+A value of 1 implies that a linear equation describes the relationship between the session length and transaction times perfectly. Their Pearson correlation coefficients of all the 11 transaction types are shown in Table 2. It is explained that when customers repeat certain tasks, they will take the same steps periodically.
+
+
+\begin{table}[ht]
+\centering
+\caption{Pearson correlation coefficient of session length and transactions
+(sessions with more than 10 requests)}
+\begin{tabular}{|c|c|c|c|c|c|} \hline
+Transaction Types&No. of sessions&R &Transaction Types&No. of sessions&R\\ \hline
+1     &364 &   0.80 &  7     &7  &  1.0  \\
+2	  &94 &   1.0   &  8     &7  &   1.0  \\
+3     &8232 &  0.91 &  9     &5  &   0.98     \\
+4     &302 &   0.98 &  10    &47 &   0.99    \\
+5     &39 &   0.97  &  11    &26 &   0.96   \\
+6     &60 &   1.0   &  && \\
+\hline\end{tabular}
+\end{table}
+
+
+\subsection{Transaction Amount}
+
+\begin{figure}[htb]
+    \centering
+    \epsfig{file=amountperpayment.eps, width=2.7in}
+    \caption{CCDF of amount per transaction, which follows a lognormal distribution.}
+    %\caption{CCDF of pays:$R^2=0.987$}
+\end{figure}
+
+As shown in Figure~9, the amount of transactions clearly follows a log-normal distribution. The mean, and median of transactions are 22,786 and 1900(CNY).
+Among the transactions, the largest $10\%$ contribute $81.35\%$ of the total transaction amount, which largely follows the 80-20 rule~\cite{kock199980}. The probability distribution function for the lognormal distribution is given by:
+
+\begin{equation}
+ %f(x) = \frac{1}{2} - \frac{1}{2}erf(\frac{{\ln x - \mu }}{{\sqrt 2 \sigma }})
+f(x) = \frac{1}{{x\sigma \sqrt {2\pi } }}{e^{ - \frac{{{{(lnx - \mu )}^2}}}{{2{\sigma ^2}}}}}
+\end{equation}
+
+
+We fit the log-normal distribution of Figure~9 as Eq.(4) with parameters $\sigma= 2.11,\mu= 8.83$.
+
+
+\begin{table}[ht]
+\centering
+\caption{Ratio of different transaction types, sorted by ratio of transaction amount.}
+\begin{tabular}{|c|c|c|} \hline
+Transaction Types&Amount(\%)&No. of transactions(\%)\\ \hline
+Inner-bank transfer	    &   $43.67\%$   &   $27.93\%$   \\
+Inter-bank transfer     &   $37.61\%$   &   $59.31\%$	\\
+Investment   	        &   $11.90\%$    &   $1.51\%$   \\
+TimToSav                &   $2.11\%$    &   $0.62\% $   \\
+SavToTim                &   $2.08\%$    &   $0.85\% $   \\
+Others                  &   $2.63\%$    &   $9.78\% $   \\
+\hline\end{tabular}
+\end{table}
+
+As shown in Table~3, the top 5 transaction types sorted by amount are inter-bank transfer,  inner-bank transfer, investment, timtosav, and savtotim in the online banking system. Transfer, including inter-bank and inner-bank transfers, contributes to a large proportion of amounts ($81.28\%$) and transactions ($87.24\%$). Investment takes a few transactions ($1.51\%$), but contributes a lot amount ($11.9\%$). Timtosav and savtotim are money moving activities between term deposit and current deposit. We notice that in our data, the transaction of credit card repayment is not at top 5, which reflects the fact that credit card payments are not very popular in China.
+
+
+\subsection{Transaction Account}
+
+\begin{figure*}[ht]
+\centering
+\label{fig:transctionaccount}
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2.0in]{numberofaccounts.eps}
+		\centerline{(a) The No. of accounts per customer}
+	\end{minipage}
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2.0in]{moneylaundry2.eps}
+		\centerline{(b)The No. of transaction accounts and payees}
+    \end{minipage}
+    \caption{Characteristic of transaction accounts.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+We investigate the number of transaction accounts referring to one customer in our data, which are the accounts customers query or use to pay. In
+Figure~10(a), we find that $92.08\%$ of customers have zero or one account.
+Zero account here does not mean that the customer has no transaction accounts, but that the customers have no operations with their transaction accounts, like query or payment, in our data in 12 days. As we known, a customer usually has at least one transaction account(referring to a bank card). However, we can observe that there are some customers having hundreds of accounts, and the maximum is 465 in our data.
+
+Figure~10(b) shows that some customers control many accounts to transfer money to one account, and some customers control a few accounts to transfer money to lots of accounts. This behavior of concentration and dispersion of funds in short time controlled by one customer is very likely money laundry activity. To reduce this risk, the People's Bank Of China issued rules to limit the number of accounts that customer could apply for since December 2016.
+
+\subsection{Transaction Network}
+
+The transaction activities between payers and payees describe the transaction relationship. We use the transaction relationship to build the transaction graph like interaction graph in the social network. A graph is broadly defined by a set of nodes $\nu$ and a set of edges $\varepsilon$ that connect nodes. In transaction graph, nodes are transaction accounts (payers or payees) and edges are transaction activities between these nodes. Transactions are not symmetric. There is an edge from $u$ to $v$ when payer $u$ pays money to payee $v$. We define the outdegree of a account as the number of payees this account pays to, indegree as the number of payers who pay to this account in our 12-day data. Considering that payees are out of this bank in inter-bank transfers, we just build the transaction graph based on the inner-bank transfer activities.
+
+
+The distribution of outdegree and indegree is shown in Figure~11(a). In this snapshot of transaction activity graph, the outdegree follows a power-law distribution fitted with parameter $\alpha=1.646$, the indegree with parameters $\alpha=1.724$, meaning also a heavy-tailed distribution. This power-law distributions of indegree and outdegree indicate that the transaction graph is a scale-free network described in complex network theory\cite{mislove2007measurement}. We find that $64.83\%$ accounts have higher outdegree than indegree. The maximum outdegree is 1,525, which indicates a business account who transactions to thousand payees during 12 days. The maximum indegree is 440, which indicates a lot of accounts transferring funds to this account.
+
+
+The power-law distribution of indegree and outdegree have some different aspects with social networks or Web. In Figure~11(a), we can find that the high-indegree and high-outdegree accounts are always not the same as each other. For the top $35\%$ of accounts ranked by indegree and outdegree, the overlap is only $3.768\%$, which means high-degree accounts and high-outdegree accounts are different groups. While between $35\%$ and $68\%$,  the overlap is slowly increasing when the number of accounts increase, which means a group of accounts are active in both paid and be paid activities. The rest accounts are non-active accounts with a few transactions.
+
+\begin{figure*}[htb]
+\centering
+\label{fig:transction_network}
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2.0in]{payerspayees.eps}
+		\centerline{(a)Outdegree and indegree per account}
+	\end{minipage}
+    \begin{minipage}[t]{0.45\linewidth}
+		\centering
+		\includegraphics[width=2.0in]{overlap1.eps}
+		\centerline{(b)Overlap of top $x\%$ accounts}
+    \end{minipage}
+    \caption{Characteristic of transaction account network.}
+    %The $R^2$(c)0.994 (d)0.993(e)0.993(f)0.995}
+\end{figure*}
+
+
+\section{Related Work}
+
+A few works have been carried out on customer behavior analysis in online banking because of the privacy, secrecy and commercial interest concerns. Their works focused on two aspects: service quality improving and the online banking fraud detecting.
+
+\emph{Service quality improving:} Some works attempted to improve the service quality of online banking services~\cite{pikkarainen2006measurement,herington2009retailing,RodriguesCO17:journalschb,journals/tele/HanafizadehKK14}.
+%By the way of understanding customers' motivations, effective strategies were devised for improving their services~\cite{journals/tele/HanafizadehKK14}.
+\textbf{These works focus on the attitude of customers who use online banking to investigate the factors that affect customer satisfaction and loyalty to online banking services~\cite{journals/tele/HanafizadehKK14}.
+They usually adopted the way of asking the participants and bank customers with a questionnaire.} Different to their work, our analysis is based on the transaction data, which comprehensively describes customer behaviors during transaction activities in server side, with the objective to in-depth understand customer behaviors and to improve the quality of online banking services.
+
+\emph{Online banking fraud detecting:} Some works detected the online banking fraud based on customer behavior analysis~\cite{karlsen:2008profile,kovach:2011online,wei:2013effective,CabanesBG13:conficdm,carminati:2015banksealer}.
+Their research usually models the behavior of each customer and monitors whether it deviates from normal behavior~\cite{jyothsna:2011review}. However, these works do not systematically analyze customer behavior based on the real data. Wei~\emph{et al.}~\cite{wei:2013effective} introduced a systematic online banking fraud detection method using transaction data from a large Australian bank, but they did not provide any analysis for the online banking customer behavior. Carminati~\emph{et al.}~\cite{carminati:2015banksealer} developed a seme-supervised and unsupervised fraud and anomaly detection method based on a real-world dataset of a large Italian national bank. His system design is guided by data analysis, but his work only describes the distribution of the amount and transaction frequency. Compared to these studies, our research relies on the dataset that includes more details about the transaction, and more online banking pattern are revealed in this paper.
+
+
+
+\section{Conclusion}
+
+In this paper, we comprehensively analyze the characteristics of online banking customer behavior, based on a unique dataset of personal transactions collected from a large bank in China. To the best of our knowledge, this work is the first attempt to understand how customers interact with online banking system.
+
+We first analyzed the statistical and distributional properties of important variables of access pattern from the session level. Our analysis shows a lot of different types of power-law behaviors, e.g., the session length (of requests). And we observe that sessions from thirdparty websites take less time and operations than session from online banking. Then we use the clickstream model to deeply understand transaction activities, and explain the reason why thirdparty sessions take less operations and time. Finally, we investigate the details of the transaction behavior, e.g., the number of transactions, the transaction amount, and transaction accounts. Our analysis reveals some abnormal accounts behind the wide variety of customer behaviors, like corporate accounts and dishonest internal employees.
+
+Based on our analysis, we plan to develop a method to detect the abnormal online banking accounts like money laundry accounts and dishonest inner employees in the future.
+
+\bibliographystyle{abbrv}
+\bibliography{sigproc}
+
+\end{document}
